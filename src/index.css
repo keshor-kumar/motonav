@@ -1,0 +1,131 @@
+:root {
+  /* ---- Color tokens: black + racing red, premium motorcycle ----
+     Token NAMES are unchanged from the original "asphalt + ember" palette
+     on purpose — every component already styles itself via these
+     variables, so remapping values here reskins the entire app without
+     touching component code. --accent-ember is now the primary racing
+     red (brand/active/primary actions); --accent-red is a brighter red
+     reserved for alerts/danger/SOS, giving two deliberately distinct
+     reds rather than one color doing every job. */
+  --bg-void: #070707;
+  --bg-surface: #111111;
+  --bg-surface-2: #181818;
+  --bg-surface-3: #1f1f1f;
+  --border-subtle: #2a2a2a;
+  --border-strong: #3a3a3a;
+
+  --accent-ember: #e10600;
+  --accent-ember-dim: #8a0500;
+  --accent-amber: #ffb627;
+  --accent-teal: #2dd4bf;
+  --accent-violet: #8a7cff;
+  --accent-red: #ff2020;
+
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-muted: #666666;
+
+  --font-display: "Rajdhani", "Inter", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  --shadow-elevated: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow-ember: 0 0 0 1px rgba(225, 6, 0, 0.4), 0 8px 24px rgba(225, 6, 0, 0.25);
+
+  /* Premium dark glass cards — used for the new floating map overlay icons/panels */
+  --glass-bg: rgba(17, 17, 17, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 16px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img, svg {
+  max-width: 100%;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, select {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--accent-amber);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-surface-3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

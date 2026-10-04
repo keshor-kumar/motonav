@@ -1,0 +1,846 @@
+/* ============================================================
+   MotoNav — Stage 2 navigation styles
+   (real map, GPS, search, route summary, navigation mode)
+   ============================================================ */
+
+/* Dashboard content no longer has a floating search bar overlapping it
+   from above (that was the Stage 1 MapPlaceholder layout) — RoutePlanner
+   handles its own map + controls inline, so drop that reserved top gap. */
+.dashboard__content--flush-top {
+  padding-top: 18px;
+}
+
+/* ---------- Route planner shell ---------- */
+.route-planner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.route-planner__map {
+  height: 240px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+.route-planner__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- Real map (MapLibre GL JS + MapTiler) ---------- */
+.map-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.map-view__container {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-surface-2);
+  z-index: 0;
+}
+/* Let a single-finger vertical swipe over the map fall through to the
+   page's native scroll instead of being claimed for map gestures at the
+   browser/compositor level — touch-action is a CSS contract the browser
+   enforces before any JS gesture code (including cooperativeGestures)
+   runs, so it has to be set explicitly here rather than relying on JS
+   alone. Horizontal pan / pinch-zoom (2-finger) are unaffected. */
+.maplibregl-canvas {
+  touch-action: pan-y !important;
+}
+/* MapLibre's own control chrome, restyled to fit the dark theme */
+.maplibregl-ctrl-attrib {
+  background: rgba(10, 12, 16, 0.75) !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-attrib a { color: var(--text-secondary) !important; }
+.maplibregl-ctrl-group {
+  background: var(--bg-surface-2) !important;
+  border: 1px solid var(--border-strong) !important;
+  box-shadow: none !important;
+}
+.maplibregl-ctrl-group button { background: transparent !important; }
+.maplibregl-ctrl-group button:hover { background: var(--bg-surface-3) !important; }
+.maplibregl-ctrl-icon { filter: invert(1) brightness(1.6); }
+/* cooperativeGestures hint bubble ("use two fingers to move the map") */
+.maplibregl-cooperative-gesture-screen {
+  background: rgba(10, 12, 16, 0.55) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.9rem !important;
+}
+
+/* "My Location" button, floating on the map */
+.map-view__mylocation {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(18, 21, 27, 0.92);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+.map-view__key-warning {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 5;
+  background: rgba(255, 182, 39, 0.16);
+  border: 1px solid var(--accent-amber);
+  color: var(--accent-amber);
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+
+/* Custom marker elements (built as plain HTML, passed to maplibregl.Marker) */
+.map-marker { background: transparent; border: none; cursor: pointer; }
+
+/* "start" — a plain pin for a searched (non-GPS) starting point */
+.map-marker__dot {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-ember);
+  border: 3px solid #070707;
+  box-shadow: 0 0 0 2px var(--accent-ember);
+}
+/* Static ring, not an animated pulse — a visible "you are here" indicator
+   without a continuously-repainting loop on every frame. */
+.map-marker__pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-ember);
+  opacity: 0.45;
+}
+
+/* "moto" — the rider's real current GPS position: a motorcycle icon that
+   rotates to face the device heading (or a bearing derived from consecutive
+   GPS fixes when the device doesn't report one). Never a generic dot. */
+.map-marker--moto {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+}
+.map-marker__moto-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-teal);
+  opacity: 0.4;
+}
+.map-marker__moto-rotate {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 2px solid var(--accent-teal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.25s ease-out;
+  transform: rotate(0deg);
+}
+.map-marker__moto-icon {
+  font-size: 16px;
+  line-height: 1;
+  /* the base emoji glyph faces left/forward by default — no extra offset needed for a north (0deg) heading */
+}
+
+/* Co-rider markers: same mechanics as "moto", visually distinct (amber vs
+   the current rider's teal) with a name+distance label so a glance at the
+   map tells you who's who without tapping anything. */
+.map-marker--corider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.map-marker__corider-rotate {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 2px solid var(--accent-amber);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.25s ease-out;
+  transform: rotate(0deg);
+}
+.map-marker__corider-icon { font-size: 15px; line-height: 1; }
+.map-marker__corider-label {
+  background: rgba(10, 12, 16, 0.82);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.map-marker--corider.map-marker--offline { opacity: 0.45; }
+.map-marker--corider.map-marker--offline .map-marker__corider-rotate { border-color: var(--text-muted); }
+
+.map-marker__flag {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+.map-marker__pin {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--accent-amber);
+  border: 2px solid #070707;
+}
+.map-marker--selected .map-marker__pin {
+  background: var(--accent-ember);
+  width: 18px;
+  height: 18px;
+  box-shadow: 0 0 0 3px rgba(255, 106, 51, 0.35);
+}
+
+/* ---------- Location permission button ---------- */
+.geo-btn-group { display: flex; flex-direction: column; gap: 8px; }
+.geo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 50px;
+  padding: 13px 18px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.94rem;
+  cursor: pointer;
+}
+.geo-btn:disabled { cursor: default; opacity: 0.85; }
+.geo-btn--granted {
+  background: rgba(45, 212, 191, 0.14);
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
+}
+.geo-btn--error {
+  background: rgba(255, 77, 77, 0.12);
+  border-color: rgba(255, 77, 77, 0.45);
+  color: var(--accent-red);
+}
+.geo-btn__hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  padding: 0 2px;
+}
+
+/* ---------- Location search field ---------- */
+.loc-search { display: flex; flex-direction: column; gap: 7px; }
+.loc-search__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.loc-search__row input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  color: var(--text-primary);
+  font-size: 0.94rem;
+  outline: none;
+}
+.loc-search__row input:focus { border-color: var(--accent-ember); }
+.loc-search__btn {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.loc-search__btn:disabled { opacity: 0.7; cursor: default; }
+.loc-search__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.loc-search__hint--error { color: var(--accent-red); }
+.loc-search__results {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.loc-search__results li button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 10px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.loc-search__results li button:hover,
+.loc-search__results li button:focus-visible {
+  background: var(--bg-surface-2);
+}
+.loc-search__results li button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Loading / error inline messages ---------- */
+.loading-msg,
+.error-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  margin: 0;
+}
+.loading-msg { color: var(--text-secondary); background: var(--bg-surface-2); }
+.error-msg { color: var(--accent-red); background: rgba(255, 77, 77, 0.1); border: 1px solid rgba(255, 77, 77, 0.3); }
+
+/* ---------- Route summary card ---------- */
+.route-summary-card { display: flex; flex-direction: column; gap: 14px; }
+.route-summary-card__path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.route-summary-card__arrow { color: var(--accent-ember); flex-shrink: 0; }
+.route-summary-card__stats {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.route-summary-card__stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+/* ---------- Navigation mode (full screen) ---------- */
+.nav-view {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-void);
+}
+.nav-view__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.nav-view__map {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.nav-view__map-fill { height: 100%; }
+
+.nav-view__recenter {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  background: rgba(18, 21, 27, 0.92);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+.nav-view__sheet {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+.nav-view__warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-amber);
+  background: rgba(255, 182, 39, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  margin: 0;
+}
+.nav-view__stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.nav-view__stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* ---------- Nearby (real places) ---------- */
+.nearby-panel__geo { margin-bottom: 12px; }
+.nearby-panel__categories {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.nearby-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 58px;
+}
+.nearby-chip--active {
+  background: rgba(255, 106, 51, 0.14);
+  border-color: var(--accent-ember);
+  color: var(--accent-ember);
+}
+.nearby-chip__emoji { font-size: 1.3rem; line-height: 1; }
+
+.nearby-panel__map {
+  height: 200px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+.nearby-panel__map-fill { height: 100%; }
+
+/* Place card: the row is now a real <button>, so reset native button chrome */
+.place-card__row--button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.place-card--selected { outline: 1.5px solid var(--accent-ember); outline-offset: 0; border-radius: var(--radius-md); }
+.place-card__emoji { font-size: 1.15rem; line-height: 1; }
+.place-card__navigate {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  justify-content: center;
+}
+
+/* ---------- Group riders (real, Stage 3) ---------- */
+.group-riders__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.group-rider {
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+}
+.group-rider--selected {
+  outline: 1.5px solid var(--accent-ember);
+}
+.group-rider__row {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.group-rider__name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-rider__meta {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.group-rider__details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+.group-rider__detail-line {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.group-riders__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Separation alert banner ---------- */
+.separation-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 182, 39, 0.14);
+  border: 1px solid var(--accent-amber);
+  color: var(--accent-amber);
+  font-size: 0.86rem;
+}
+.separation-alert__dismiss {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* ---------- Share ride (Copy/Share/QR) ---------- */
+.share-ride { display: flex; flex-direction: column; gap: 12px; }
+.share-ride__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.share-ride__qr {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+}
+.share-ride__qr img {
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 8px;
+}
+.share-ride__qr-fallback {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ---------- Wind indicator (compact, top of map) ---------- */
+.route-planner__map-wrap { position: relative; }
+.wind-indicator {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+}
+.wind-indicator__main { flex-shrink: 0; }
+.wind-indicator__gust { color: var(--text-secondary); font-weight: 500; flex-shrink: 0; }
+.wind-indicator__relative {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.wind-indicator__relative--tailwind { background: rgba(45, 212, 191, 0.18); color: var(--accent-teal); }
+.wind-indicator__relative--crosswind { background: rgba(255, 182, 39, 0.18); color: var(--accent-amber); }
+.wind-indicator__relative--headwind { background: rgba(255, 32, 32, 0.18); color: var(--accent-red); }
+
+/* ---------- Map icon toolbar ----------
+   Deliberately NOT overlaid on the map: on a ~200px-tall mobile map, an
+   absolutely-positioned 2-row icon grid would collide with the "My
+   Location" button and markers. A slim strip directly below the map stays
+   compact, icon-first, and tap-to-reveal (matching the spec's intent)
+   without that collision risk — horizontally scrollable so all 8 icons
+   stay comfortably touch-sized even on a 320px screen. */
+.map-icon-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 2px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.map-icon-row::-webkit-scrollbar { display: none; }
+.map-icon-btn {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 68px;
+  min-height: 56px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.map-icon-btn__label { font-size: 0.62rem; font-weight: 600; color: var(--text-secondary); }
+.map-icon-btn--active {
+  border-color: var(--accent-ember);
+  box-shadow: 0 0 0 1px rgba(225, 6, 0, 0.3), 0 0 16px rgba(225, 6, 0, 0.25);
+}
+.map-icon-btn--active .map-icon-btn__label { color: var(--accent-ember); }
+.map-icon-btn--alert { border-color: var(--accent-red); color: var(--accent-red); }
+
+/* ---------- Icon panel (bottom sheet) ---------- */
+.icon-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.55);
+}
+.icon-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 51;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-strong);
+  border-radius: 20px 20px 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.5);
+}
+.icon-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.icon-panel__title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1rem; }
+.icon-panel__unavailable { color: var(--text-muted); font-size: 0.86rem; font-style: italic; }
+
+/* ---------- Pre-ride warm-up (full screen) ---------- */
+.warmup-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg-void);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(16px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.warmup-screen__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.warmup-screen__close { position: absolute; top: calc(16px + env(safe-area-inset-top)); right: 20px; }
+.warmup-screen__progress-label { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary); }
+.warmup-screen__progress-dots { display: flex; gap: 6px; margin-bottom: 20px; }
+.warmup-screen__dot { width: 8px; height: 8px; border-radius: 999px; background: var(--border-strong); }
+.warmup-screen__dot--active { background: var(--accent-ember); }
+.warmup-screen__illustration {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.warmup-screen__name { font-family: var(--font-display); font-size: 1.5rem; text-align: center; margin-bottom: 8px; }
+.warmup-screen__instructions { color: var(--text-secondary); text-align: center; max-width: 320px; margin-bottom: 20px; line-height: 1.5; }
+.warmup-screen__timer { font-family: var(--font-mono); font-size: 2.2rem; font-weight: 700; color: var(--accent-ember); margin-bottom: 20px; }
+.warmup-screen__controls { display: flex; align-items: center; gap: 20px; margin-bottom: 12px; }
+.warmup-screen__play {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent-ember), #ff3b30);
+  color: #0a0a0a;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-glow-ember);
+}
+.warmup-screen__skip { margin-bottom: auto; }
+.warmup-screen__disclaimer {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 320px;
+  margin-top: 16px;
+}
+.warmup-screen__done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+}
+.warmup-screen__done h2 { font-family: var(--font-display); font-size: 1.6rem; }
+
+/* ---------- Connection status (real backend reachability, not Wi-Fi) ---------- */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.connection-status--online {
+  background: rgba(45, 212, 191, 0.12);
+  color: var(--accent-teal);
+}
+.connection-status--offline {
+  background: rgba(255, 32, 32, 0.12);
+  color: var(--accent-red);
+  flex-wrap: wrap;
+}
+.connection-status__retry {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---------- Responsive: keep the new surfaces mobile-first ---------- */
+@media (max-width: 420px) {
+  .route-planner__map { height: 200px; }
+  .loc-search__results { max-height: 180px; }
+  .nav-view__stats { gap: 14px; }
+  .nav-view__recenter { padding: 10px 14px; font-size: 0.8rem; }
+  .nearby-panel__map { height: 160px; }
+  .nearby-chip { padding: 10px 4px; font-size: 0.68rem; min-height: 52px; }
+  .map-view__mylocation { font-size: 0.76rem; padding: 9px 12px; }
+}
+
+@media (min-width: 1024px) {
+  .route-planner__map { height: 340px; }
+}
