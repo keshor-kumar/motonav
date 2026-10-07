@@ -1,0 +1,35 @@
+{
+  "name": "motonav",
+  "private": true,
+  "version": "0.5.0",
+  "type": "module",
+  "description": "MotoNav \u2014 group motorcycle ride navigation. Stage 3: real group rides, shareable links, live co-rider tracking.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "server": "npm run dev --prefix server",
+    "server:install": "npm install --prefix server",
+    "server:migrate": "npm run migrate --prefix server",
+    "dev:all": "concurrently -n FRONTEND,BACKEND -c blue,magenta \"npm run dev\" \"npm run server\"",
+    "postinstall": "node -e \"console.log('\\n\\u001b[33m[motonav] Frontend deps installed. This project ALSO has a separate backend in server/. Run: npm run server:install && npm run server:migrate && npm run dev:full\\u001b[0m\\n')\"",
+    "dev:full": "concurrently -n FRONTEND,BACKEND -c blue,magenta \"npm run dev\" \"npm run server\""
+  },
+  "dependencies": {
+    "lucide-react": "^0.383.0",
+    "maplibre-gl": "^4.7.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0",
+    "socket.io-client": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.0.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  }
+}
