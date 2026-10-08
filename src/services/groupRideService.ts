@@ -17,7 +17,7 @@ export interface SessionResult {
   token: string;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!hasApiBaseUrl) throw new Error(NOT_CONFIGURED_MESSAGE);
 
   let response: Response;
@@ -47,7 +47,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function authHeader(token?: string): Record<string, string> {
+export function authHeader(token?: string): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -89,4 +89,15 @@ export function leaveGroupRide(session: GroupSession): Promise<{ ok: true }> {
 
 export function endGroupRide(session: GroupSession): Promise<{ ride: GroupRide }> {
   return request("/api/session/end", { method: "POST", headers: authHeader(session.token) });
+}
+
+export interface IceServerConfig {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+/** ICE servers for voice. Authenticated, so TURN credentials never ship in the frontend bundle. */
+export function getIceServers(session: GroupSession): Promise<{ iceServers: IceServerConfig[] }> {
+  return request("/api/comms/ice", { headers: authHeader(session.token) });
 }

@@ -1,6 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 import { SOCKET_URL } from "@/config/env";
 import type { GroupMember, GroupRide } from "@/types";
+import type { CommsAck, IceCandidatePayload, QuickMessageEvent, QuickMessageKind, VoicePeerInfo } from "@/types/comms";
 
 // ============================================================
 // Thin Socket.IO client wrapper. Everyone in the same ride joins
@@ -17,6 +18,15 @@ export interface ServerToClientEvents {
   "session:left": () => void;
   "session:replaced": () => void;
   "server:error": (error: { code: string; message: string }) => void;
+  // ---- rider communications (same socket, same ride room) ----
+  "voice:roster": (payload: { peers: VoicePeerInfo[] }) => void;
+  "voice:peer-reset": (payload: { riderId: string }) => void;
+  "rtc:offer": (payload: { from: string; sdp: string }) => void;
+  "rtc:answer": (payload: { from: string; sdp: string }) => void;
+  "rtc:ice": (payload: { from: string; candidate: IceCandidatePayload }) => void;
+  "ptt:timeout": () => void;
+  "comms:message": (message: QuickMessageEvent) => void;
+  "comms:error": (error: { code?: string; message?: string }) => void;
 }
 
 export interface LocationPayload {
@@ -36,6 +46,15 @@ export interface LocationAck {
 /** Events the client emits. The last parameter is the acknowledgement callback. */
 export interface ClientToServerEvents {
   "location:update": (payload: LocationPayload, ack: (response: LocationAck) => void) => void;
+  "voice:join": (ack: (response: CommsAck) => void) => void;
+  "voice:leave": () => void;
+  "voice:state": (payload: { muted: boolean }) => void;
+  "ptt:start": () => void;
+  "ptt:stop": () => void;
+  "rtc:offer": (payload: { to: string; sdp: string }, ack: (response: CommsAck) => void) => void;
+  "rtc:answer": (payload: { to: string; sdp: string }, ack: (response: CommsAck) => void) => void;
+  "rtc:ice": (payload: { to: string; candidate: IceCandidatePayload }) => void;
+  "comms:message": (payload: { kind: QuickMessageKind }, ack: (response: CommsAck) => void) => void;
 }
 
 // Socket<ListenEvents, EmitEvents>: EmitEvents defaults to ListenEvents, so it must be

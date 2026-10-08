@@ -6,7 +6,7 @@ GL JS), real GPS, real geocoding/search, real routing, real nearby places
 shareable link/QR, have friends join from their own phones, and see everyone
 live on the same map via a real backend (Express + Socket.IO + PostgreSQL).
 
-Voice and music remain UI mocks (explicitly out of scope for this stage).
+Voice is real push-to-talk (Stage 4); music remains a UI preview.
 
 ## Design system, landing page and app shell
 
@@ -21,6 +21,104 @@ Voice and music remain UI mocks (explicitly out of scope for this stage).
 **Group ride UI:** Crew panel (ride name, destination, ride code, copy/share/QR, live rider list with riding/stopped/offline and real distance), tap a rider or their map marker for a detail card with **Navigate to rider**, separation toasts (threshold configurable in More).
 
 **SOS** is hold-to-open (1.5 s) so it can't fire by accident. It offers **Call 112**, **Share my location** (Web Share / clipboard link) and **Nearby hospitals**. It does not contact emergency services or your crew by itself, and says so.
+
+## Stage 4 — Rider Comms (push-to-talk, quick messages, rider signals)
+
+During an active ride the **Comms** tab (and a floating mic button on the map) gives riders three things, all on the **existing** ride socket and ride room — no second realtime system, no new database tables.
+
+**Push-to-talk (WebRTC).** Audio goes directly rider-to-rider over WebRTC; Socket.IO only carries signalling. Press and hold to talk, release to stop. The first press asks for microphone permission. States shown: enable voice, permission needed/denied, connecting, connected, transmitting, *<name> is speaking*, muted, reconnecting/disconnected. Controls: mic mute, speaker mute, leave voice, audio status (quality + per-rider link). It is a small full mesh (server cap: 8 riders in voice); the browser side lives in `src/services/voiceMesh.ts`, so it can be swapped for an SFU later without touching the UI. For each pair the rider with the lower id makes the offer, so offers never collide. A stuck button is auto-released by the server after 45 s, and voice pauses when the app is backgrounded.
+
+**Quick ride messages.** Eight one-tap messages (stopping, fuel, break, hazard, slow down, wait for me, meet here, emergency). Riders get a compact auto-dismissing banner (hazard and emergency rank higher, emergencies stay longer and vibrate on phones that support it); a "Show" button centres the map on the sender's last position. The sender's name and position come from the server's records, never from the client. Messages are real-time only and are not stored.
+
+**Rider signals.** A full-screen, swipeable guide (17 common signals in 6 categories, original SVG illustrations) opened from the Comms tab or More. It is labelled *Common Rider Signals*: meanings vary by country, riding school and group, and where no standard signal exists (emergencies) the card says so instead of inventing one. Study it off the bike.
+
+**Rider list.** Each rider shows their voice state (connected / speaking / muted / connecting / reconnecting) next to their riding status.
+
+### Server events (same socket, same ride room)
+
+Client to server: `voice:join` (ack), `voice:leave`, `voice:state {muted}`, `ptt:start`, `ptt:stop`, `rtc:offer` (ack), `rtc:answer` (ack), `rtc:ice`, `comms:message {kind}` (ack).
+Server to client: `voice:roster {peers}`, `voice:peer-reset`, `rtc:offer|answer|ice {from,…}`, `ptt:timeout`, `comms:message`, `comms:error`.
+HTTP: `GET /api/comms/ice` (authenticated) returns the ICE servers.
+
+### Security
+
+The ride and rider for every comms event come from the verified socket (session token + database membership), never from the payload. Signalling can only be relayed to a voice participant of the **sender's own ride** (rooms are keyed by the server-derived ride id). Offers/answers/ICE/messages are validated and size-bounded; quick messages use a whitelist and a per-rider rate limit; voice presence is cleared on disconnect, leave and end-ride. Nothing is recorded; no audio ever touches the server or database. All of this logic is in `server/src/comms.ts` and is covered by `server/test/comms.test.ts`.
+
+### Configuration: STUN / TURN
+
+Voice works with the default public STUN server for most riders. Riders on strict mobile-carrier networks (symmetric NAT) can only connect through a **TURN relay**. To add one, set these **server-side** variables on your backend (Render) — they are optional and never reach the frontend bundle:
+
+```
+STUN_URLS=            # optional, comma-separated; defaults to Google's public STUN
+TURN_URLS=            # e.g. turn:turn.example.com:3478,turns:turn.example.com:5349
+TURN_USERNAME=
+TURN_CREDENTIAL=
+```
+
+Without TURN, a small share of rider pairs may stay on "connecting". Voice also requires HTTPS (Vercel provides it) and microphone permission. No frontend environment variables changed.
+
+## Stage 5 — Moto News, Famous Rides, Moto Community
+
+Three additive modules; ride rooms, comms and navigation are untouched.
+
+### Moto News — `/news`
+`GET /api/news/motorcycle?category=&refresh=1` on the backend calls NewsAPI.org with `NEWS_API_KEY` (server-only, sent in the `X-Api-Key` header) and returns normalized `{title, description, image, publishedAt, source, url, category}`. Categories are assigned by a keyword classifier (Latest, India, New Bikes, Adventure/Touring, MotoGP/Racing, EV, Safety, Technology). 15-minute cache, 60 s floor between forced refreshes, stale data served if the provider fails, concurrent requests de-duplicated. Cards show a snippet and "Read Article" opens the publisher's page; nothing is copied. No key set → `503 not_configured` and a friendly page state.
+
+### Famous Rides — `/routes`, `/routes/:id`
+Ten curated routes (`src/data/famousRoutes.ts`). Cards show an SVG trace of the real waypoints (no tile/WebGL cost), stats and a bookmark (localStorage). The detail page uses the existing MapTiler map and the existing `getRoute()` (Geoapify) for a live line, falling back to the curated waypoints. **Start This Route** navigates to `/dashboard` with the route's start/destination, which the existing dashboard turns into a normal route + navigation. Distances/times are approximate planning figures.
+
+### Moto Community — `/community`, `/community/:code`
+Text chat, voice messages and a shareable link. No accounts: creating or joining returns a community token (JWT, `typ:"community"`, signed with the existing `JWT_SECRET`); it cannot be used as a ride token or vice-versa. Rider names are unique per community (case-insensitive). The link, Copy, Share and QR all use `VITE_PUBLIC_APP_URL`.
+
+**Voice:** hold the mic to record, release to send, slide left to cancel; a quick tap locks hands-free recording with Send/Cancel. The browser uploads raw bytes to the backend (never to Supabase directly), the backend validates (auth first, 2 MB cap, MIME allow-list, magic-byte check, 0.7–60 s), stores the file in the **private** bucket, saves the storage *path* in Postgres and broadcasts only metadata + a 1 h signed URL. The database stores only the object path, so a voice message stays playable forever: when a URL is old or fails, the app calls `GET /:code/messages/:id/audio-url` and the backend mints a fresh one.
+
+#### New REST endpoints (`/api/community`)
+| Method | Path | Auth |
+|---|---|---|
+| POST | `/` create `{name, description?, riderName}` | none (rate-limited) |
+| GET | `/:code` public info | none |
+| POST | `/:code/join` `{riderName}` | none (rate-limited) |
+| GET | `/:code/session` | community token |
+| GET | `/:code/messages?before=&limit=` | member |
+| POST | `/:code/messages` `{text}` | member |
+| GET | `/:code/messages/:id/audio-url` fresh playable URL (member only, community-scoped) | member |
+| POST | `/:code/audio` raw body, `Content-Type`, `X-Audio-Duration-Ms` | member |
+| GET | `/audio/:cid/:file` dev-only memory storage | none |
+| GET | `/api/news/motorcycle` | none |
+
+#### New Socket.IO events (namespace `/community`, room `community:<id>`)
+Client→server: `community:join` (ack), `community:leave`, `community:message {text}` (ack), `community:typing`. Server→client: `community:message`, `community:audio-message`, `community:member-joined`, `community:typing`. Audio is sent over HTTP then broadcast; there is no audio-over-socket event from the client. Membership is verified server-side from the token on connect and on every event. Rate limits: text 12 / 10 s, audio 6 / min per member. Ride sockets live on the default namespace and are unaffected.
+
+#### Database migration
+Run `npm run server:migrate` — it applies every file in `server/migrations/`, including **`002_community.sql`** (tables `communities`, `community_members`, `community_messages`, indexes, RLS enabled with no policies). It is idempotent and does not touch ride tables. You can also paste the file into the Supabase SQL editor.
+
+#### Supabase Storage setup
+1. Supabase dashboard → Storage → **New bucket** → name `community-audio`, **Public: OFF**.
+2. Optional: set a file size limit of 2 MB and allowed types `audio/webm, audio/ogg, audio/mp4, audio/mpeg, audio/wav`.
+3. On the backend (Render) set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_AUDIO_BUCKET=community-audio`. The service-role key stays **server-side only** — never a `VITE_` variable.
+Without these the backend falls back to in-memory audio (lost on restart, single instance) so local dev works with zero setup.
+
+#### New environment variables
+Backend only: `NEWS_API_KEY`, `NEWS_API_BASE_URL` (optional), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_AUDIO_BUCKET`. **No new frontend variables.** Existing names are unchanged.
+
+#### Local testing
+```
+npm install && npm run server:install
+npm run server:migrate      # only if DATABASE_URL is set
+npm run dev:full            # frontend :5173 + backend :4000
+```
+Open `/community`, create a community, then open the link in a second browser profile/phone to join. Microphone needs HTTPS or `localhost`. `cd server && npm test` runs the backend suite (56 tests).
+
+#### Deployment
+Redeploy the Render backend (new env vars + run the migration), create the storage bucket, redeploy the Vercel frontend. No `vercel.json` change is needed (the SPA rewrite already covers `/community/*`, `/routes/*`, `/news`).
+
+### Stage 5 limitations
+- Verified here: backend unit/integration tests (56), strict `tsc` for both halves against stub typings, and a Chromium (Playwright) run of the real React app against a harness that runs the project's real service/stores behind a hand-rolled HTTP/`ws` stand-in for Express/Socket.IO. **Not verified here:** `npm install`/`npm run build`, the real Express/Socket.IO/pg glue, Supabase Storage, the real NewsAPI, a real phone (iOS Safari especially), a real microphone (a fake media stream was used), the on-screen keyboard (emulated by resizing the viewport).
+- Famous Rides cover images are reused bundled photos, not route-specific; replace them in `public/images/`.
+- Each signed audio URL lasts 1 h, but the message stays playable: the app fetches a fresh URL on demand (tested against a forced-expired URL in the harness; not yet against real Supabase).
+- NewsAPI.org's developer plan is for development use and rate-limited; use a paid plan for production.
+- Community names can't be reclaimed: a rider who clears browser storage must join under a new name.
+- Start This Route uses the route's start city as the origin; use "my location" in the dashboard to route from where you are.
 
 ## Architecture
 
@@ -337,8 +435,6 @@ for you to verify before trusting the realtime path.
   `src/services/routingService.ts` for an easy future swap).
 - **Turn-by-turn depends on the routing response.** Geoapify's step schema was parsed defensively but is not verified against a live response from here; if a route has no usable steps the navigation card shows "Navigation ready". Geoapify also has no motorcycle profile (the general "drive" profile is used), and there is no automatic rerouting.
 - **Images are low resolution** (640-736 px wide portraits). They look fine under the dark overlays on phones, but full-bleed on a large desktop screen they are visibly upscaled. For a sharp desktop hero, replace the files in `public/images/` (same names) with 2000-2400 px wide versions. Also confirm you hold the licence/usage rights for these photos before deploying publicly.
-- **Group voice** gets a UI placeholder only (existing mock "Push to Talk"
-  panel) — no WebRTC, as explicitly requested.
 
 ## Structure
 
@@ -358,13 +454,15 @@ motonav/
   server/
     src/          types, validation, rideCode, store (interface), memoryStore, pgStore,
                    service (business logic), auth (JWT), hub, http (REST), socket
-                   (Socket.IO), config, index (entrypoint), migrate
-    migrations/    001_init.sql
-    test/          service.test.ts (12 tests, run with `npm test`)
+                   (Socket.IO), comms (voice signalling/PTT/quick messages), config, index (entrypoint), migrate
+    community/     Stage 5: types, validation, stores, auth, storage, service, routes, socket
+    news.ts        Stage 5: NewsAPI proxy + classifier
+    migrations/    001_init.sql, 002_community.sql
+    test/          service.test.ts + comms.test.ts (29 tests, run with `npm test`)
 ```
 
 ## Not implemented yet (by design)
 
-Accounts/auth beyond per-ride session tokens, group voice (WebRTC), music
+Accounts/auth beyond per-ride session tokens, music
 streaming/sync, SOS/push notifications, hydration/exercise/weather features,
 circular ride generation, offline/Bluetooth communication.

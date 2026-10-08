@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Flag, X } from "lucide-react";
 import MapView, { type CoRiderMarker, type FocusTarget, type MapPadding } from "@/components/map/MapView";
 import WindIndicator from "@/components/map/WindIndicator";
@@ -17,6 +17,10 @@ import RiderDetailSheet from "@/components/app/RiderDetailSheet";
 import NavigationHeader from "@/components/navigation/guidance/NavigationHeader";
 import NavigationBottomSheet from "@/components/navigation/guidance/NavigationBottomSheet";
 import WarmupScreen from "@/components/warmup/WarmupScreen";
+import RiderSignalsScreen from "@/components/signals/RiderSignalsScreen";
+import RiderCommsPanel from "@/components/comms/RiderCommsPanel";
+import CommsBanners from "@/components/comms/CommsBanners";
+import PttFab from "@/components/comms/PttFab";
 import { NEARBY_CATEGORY_ORDER } from "@/components/nearby/categoryMeta";
 import { useGroupRide } from "@/context/GroupRideContext";
 import { useRoutePlanner } from "@/hooks/useRoutePlanner";
@@ -28,6 +32,7 @@ import { usePersistentState } from "@/hooks/usePersistentState";
 import { haversineMeters } from "@/utils/geo";
 import { derivePresence } from "@/utils/presence";
 import { formatDistanceMeters } from "@/utils/format";
+import type { StartRouteState } from "@/hooks/useStartRoute";
 import type { Coordinates, GroupMember, NavLocation, NearbyPlace, PlaceCategory } from "@/types";
 
 // Stable empties so MapView's effects don't re-run on every render.
@@ -35,11 +40,13 @@ const EMPTY_GEOMETRY: [number, number][] = [];
 const EMPTY_PLACES: NearbyPlace[] = [];
 const EMPTY_MEMBERS: GroupMember[] = [];
 
-const TABS: DashTab[] = ["route", "crew", "nearby", "more"];
+const TABS: DashTab[] = ["route", "crew", "comms", "nearby", "more"];
 
 export default function DashboardPage() {
   const groupRide = useGroupRide();
   const [params] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   const [tab, setTab] = useState<DashTab>("route");
@@ -49,6 +56,7 @@ export default function DashboardPage() {
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   const [condition, setCondition] = useState<ConditionId | null>(null);
   const [showWarmup, setShowWarmup] = useState(false);
+  const [showSignals, setShowSignals] = useState(false);
   const [separationMeters, setSeparationMeters] = usePersistentState<number>("motonav.separationMeters", 2000);
 
   const clearPending = useCallback(() => setPendingDestination(null), []);
@@ -58,8 +66,23 @@ export default function DashboardPage() {
 
   const inRealRide = Boolean(groupRide.session && groupRide.ride);
 
-  // ---- real group ride: shared destination + starting from my own GPS ----
+  // ---- "Start This Route" from Famous Rides: pre-fill start + destination, then let the normal
+  // routing hook fetch the route and the normal Route panel start navigation. Declared BEFORE the
+  // group-ride seeding effect so an explicit choice wins over an auto-seeded ride destination.
   const seededRideId = useRef<string | null>(null);
+  useEffect(() => {
+    const incoming = (location.state as StartRouteState | null)?.startRoute;
+    if (!incoming) return;
+    nav.setOrigin({ label: incoming.origin.label, coords: incoming.origin.coords, source: "search" });
+    nav.setDestination({ label: incoming.destination.label, coords: incoming.destination.coords, source: "search" });
+    if (groupRide.ride) seededRideId.current = groupRide.ride.id;
+    setTab("route");
+    setSheetOpen(true);
+    navigate(location.pathname + location.search, { replace: true, state: null }); // consume it: refresh/back won't redo it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
+
+  // ---- real group ride: shared destination + starting from my own GPS ----
   useEffect(() => {
     const ride = groupRide.ride;
     if (ride && seededRideId.current !== ride.id) {
@@ -226,6 +249,7 @@ export default function DashboardPage() {
       )}
 
       <div className="app-toasts" aria-live="polite">
+        <CommsBanners onShowOnMap={(loc) => setFocusTarget({ coords: { lat: loc.latitude, lng: loc.longitude }, token: Date.now() })} />
         {groupRide.rideEndedNotice && (
           <div className="toast">
             <Flag size={16} /> <span>This ride has ended.</span>
@@ -263,6 +287,8 @@ export default function DashboardPage() {
         compact={planner.isNavigating}
       />
 
+      {inRealRide && (planner.isNavigating || isDesktop || !sheetOpen) && <PttFab />}
+
       {planner.isNavigating ? (
         <NavigationBottomSheet
           guidance={guidance}
@@ -288,6 +314,7 @@ export default function DashboardPage() {
           >
             {tab === "route" && <RoutePanel planner={planner} />}
             {tab === "crew" && <CrewPanel selectedRiderId={selectedRiderId} onSelectRider={handleSelectRider} />}
+            {tab === "comms" && <RiderCommsPanel onOpenSignals={() => setShowSignals(true)} />}
             {tab === "nearby" && (
               <NearbySheet
                 nearby={nearby}
@@ -295,7 +322,7 @@ export default function DashboardPage() {
                 onNavigateHere={(place) => navigateTo(place.name, place.coords)}
               />
             )}
-            {tab === "more" && <MorePanel onOpenWarmup={() => setShowWarmup(true)} separationMeters={separationMeters} onSeparationChange={setSeparationMeters} />}
+            {tab === "more" && <MorePanel onOpenWarmup={() => setShowWarmup(true)} onOpenSignals={() => setShowSignals(true)} separationMeters={separationMeters} onSeparationChange={setSeparationMeters} />}
           </AppSheet>
           <AppDock active={tab} sheetOpen={sheetOpen} crewCount={inRealRide ? groupRide.members.length : 0} onSelect={openTab} />
         </>
@@ -319,6 +346,7 @@ export default function DashboardPage() {
         <ConditionPanel id={condition} coords={windCoords} route={nav.route} alerts={activeAlerts} onClose={() => setCondition(null)} />
       )}
       {showWarmup && <WarmupScreen onClose={() => setShowWarmup(false)} />}
+      {showSignals && <RiderSignalsScreen onClose={() => setShowSignals(false)} />}
     </div>
   );
 }

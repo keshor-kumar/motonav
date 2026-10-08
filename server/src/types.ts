@@ -91,6 +91,13 @@ export type ErrorCode =
   | "throttled"
   | "db_unavailable"
   | "rate_limited"
+  | "not_found"
+  | "name_taken"
+  | "payload_too_large"
+  | "unsupported_media"
+  | "storage_unavailable"
+  | "not_configured"
+  | "upstream_unavailable"
   | "internal";
 
 export class AppError extends Error {

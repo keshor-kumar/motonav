@@ -1,10 +1,11 @@
-import { Route as RouteIcon, Users, Compass, Menu } from "lucide-react";
+import { Route as RouteIcon, Users, Compass, Menu, Radio } from "lucide-react";
 
-export type DashTab = "route" | "crew" | "nearby" | "more";
+export type DashTab = "route" | "crew" | "comms" | "nearby" | "more";
 
 const TABS: { id: DashTab; label: string; icon: typeof Users }[] = [
   { id: "route", label: "Route", icon: RouteIcon },
   { id: "crew", label: "Crew", icon: Users },
+  { id: "comms", label: "Comms", icon: Radio },
   { id: "nearby", label: "Nearby", icon: Compass },
   { id: "more", label: "More", icon: Menu },
 ];

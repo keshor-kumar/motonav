@@ -1,6 +1,6 @@
-import { Dumbbell, Droplet, Bell } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Dumbbell, Droplet, Bell, BookOpen, Map as MapIcon, Newspaper, Users } from "lucide-react";
 import SosButton from "@/components/app/SosButton";
-import VoicePanel from "@/components/voice/VoicePanel";
 import MusicPlayerBar from "@/components/music/MusicPlayerBar";
 
 const THRESHOLDS = [
@@ -12,11 +12,12 @@ const THRESHOLDS = [
 
 interface MorePanelProps {
   onOpenWarmup: () => void;
+  onOpenSignals: () => void;
   separationMeters: number;
   onSeparationChange: (meters: number) => void;
 }
 
-export default function MorePanel({ onOpenWarmup, separationMeters, onSeparationChange }: MorePanelProps) {
+export default function MorePanel({ onOpenWarmup, onOpenSignals, separationMeters, onSeparationChange }: MorePanelProps) {
   return (
     <div className="panel-stack">
       <section className="more-block">
@@ -33,6 +34,13 @@ export default function MorePanel({ onOpenWarmup, separationMeters, onSeparation
             <small>6 quick stretches · about 3 minutes</small>
           </span>
         </button>
+        <button type="button" className="more-card" onClick={onOpenSignals}>
+          <BookOpen size={22} />
+          <span>
+            <strong>Rider signals</strong>
+            <small>Common hand signals for group riding</small>
+          </span>
+        </button>
         <div className="more-card more-card--static">
           <Droplet size={22} />
           <span>
@@ -40,6 +48,31 @@ export default function MorePanel({ onOpenWarmup, separationMeters, onSeparation
             <small>Water, fuel, tyres, weather, route</small>
           </span>
         </div>
+      </section>
+
+      <section className="more-block">
+        <h3 className="more-block__title">Explore</h3>
+        <Link to="/community" className="more-card">
+          <Users size={22} />
+          <span>
+            <strong>Moto Community</strong>
+            <small>Text and voice chat with your riding crew</small>
+          </span>
+        </Link>
+        <Link to="/routes" className="more-card">
+          <MapIcon size={22} />
+          <span>
+            <strong>Famous rides</strong>
+            <small>10 classic routes — start one in navigation</small>
+          </span>
+        </Link>
+        <Link to="/news" className="more-card">
+          <Newspaper size={22} />
+          <span>
+            <strong>Moto news</strong>
+            <small>Launches, racing, adventure and more</small>
+          </span>
+        </Link>
       </section>
 
       <section className="more-block">
@@ -61,7 +94,6 @@ export default function MorePanel({ onOpenWarmup, separationMeters, onSeparation
 
       <section className="more-block">
         <h3 className="more-block__title">Previews</h3>
-        <VoicePanel />
         <MusicPlayerBar />
       </section>
     </div>

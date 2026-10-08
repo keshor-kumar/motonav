@@ -1,12 +1,25 @@
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
 
+export interface IceServerConfig {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
 export interface Config {
   port: number;
   isProduction: boolean;
   databaseUrl: string | null;
   jwtSecret: string;
   clientOrigins: string[];
+  /** WebRTC ICE servers handed to authenticated riders (TURN credentials stay server-side). */
+  iceServers: IceServerConfig[];
+  /** Moto News provider key. Server-only. */
+  newsApiKey: string | undefined;
+  newsApiBaseUrl: string | undefined;
+  /** Supabase Storage for community voice messages. Server-only service-role key. All three or none. */
+  supabase: { url: string; serviceRoleKey: string; audioBucket: string } | null;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -36,5 +49,29 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     .map((o) => o.trim().replace(/\/$/, ""))
     .filter(Boolean);
 
-  return { port: Number(env.PORT) || 4000, isProduction, databaseUrl, jwtSecret, clientOrigins };
+  const list = (v: string | undefined) => (v ?? "").split(",").map((u) => u.trim()).filter(Boolean);
+  const stunUrls = list(env.STUN_URLS);
+  const turnUrls = list(env.TURN_URLS);
+  const iceServers: IceServerConfig[] = [{ urls: stunUrls.length ? stunUrls : ["stun:stun.l.google.com:19302"] }];
+  if (turnUrls.length && env.TURN_USERNAME && env.TURN_CREDENTIAL) {
+    iceServers.push({ urls: turnUrls, username: env.TURN_USERNAME, credential: env.TURN_CREDENTIAL });
+  }
+
+  const sbUrl = env.SUPABASE_URL?.trim();
+  const sbKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (isProduction && (sbUrl || sbKey) && !(sbUrl && sbKey))
+    throw new Error("Set BOTH SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or neither) for community voice storage.");
+  const supabase = sbUrl && sbKey ? { url: sbUrl, serviceRoleKey: sbKey, audioBucket: env.SUPABASE_AUDIO_BUCKET?.trim() || "community-audio" } : null;
+
+  return {
+    port: Number(env.PORT) || 4000,
+    isProduction,
+    databaseUrl,
+    jwtSecret,
+    clientOrigins,
+    iceServers,
+    newsApiKey: env.NEWS_API_KEY?.trim() || undefined,
+    newsApiBaseUrl: env.NEWS_API_BASE_URL?.trim() || undefined,
+    supabase,
+  };
 }

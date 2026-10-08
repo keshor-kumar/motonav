@@ -147,6 +147,14 @@ export class RideService {
     };
   }
 
+  /** Server-side lookup of a rider's public record (used to attach trusted data to comms events). */
+  async getPublicMember(rideId: string, riderId: string): Promise<PublicMember | null> {
+    const ride = await this.store.getRideById(rideId);
+    const member = await this.store.getMember(rideId, riderId);
+    if (!ride || !member || member.connectionStatus === "left") return null;
+    return toPublicMember(member, ride);
+  }
+
   async setConnected(rideId: string, riderId: string): Promise<PublicMember | null> {
     const ride = await this.store.getRideById(rideId);
     if (!ride || ride.status !== "active") return null;

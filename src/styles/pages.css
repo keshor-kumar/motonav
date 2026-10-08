@@ -1,0 +1,145 @@
+/* ============================================================
+   MotoNav content pages: Moto News, Famous Rides, Community.
+   Black + racing red, mobile-first. Every page here scrolls
+   naturally with the document; only the chat message list
+   (and nothing else) has its own scroll area.
+   ============================================================ */
+
+/* ---------- Page shell ---------- */
+.pg { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg-void); }
+.pg__main {
+  width: 100%; max-width: 1180px; margin: 0 auto; flex: 1 0 auto;
+  padding: 18px max(16px, env(safe-area-inset-left)) 40px max(16px, env(safe-area-inset-right));
+  display: flex; flex-direction: column; gap: 18px; min-width: 0;
+}
+.pg__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.pg__titles { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 280px; }
+.pg__title { font-size: clamp(1.9rem, 6vw, 2.9rem); line-height: 1.02; }
+.pg__lede { color: var(--text-secondary); line-height: 1.55; max-width: 62ch; }
+.pg__actions { display: flex; gap: 10px; flex-shrink: 0; }
+.pg__footer { padding: 22px 16px calc(26px + env(safe-area-inset-bottom)); text-align: center; color: var(--text-muted); font-size: 0.78rem; border-top: 1px solid var(--border-subtle); }
+
+/* ---------- Site header (in flow, never covers content) ---------- */
+.sh { position: sticky; top: 0; z-index: 40; background: rgba(5, 5, 5, 0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--glass-border); padding-top: env(safe-area-inset-top); }
+.sh__row { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); height: 56px; display: flex; align-items: center; gap: 14px; }
+.sh__brand { display: inline-flex; flex-shrink: 0; }
+.sh__links { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
+.sh__link { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: var(--radius-pill); color: var(--text-secondary); font-size: 0.88rem; font-weight: 600; border: 1px solid transparent; }
+.sh__link:hover { color: #fff; }
+.sh__link--active { color: #fff; background: rgba(225, 6, 0, 0.14); border-color: rgba(225, 6, 0, 0.45); }
+.sh__link--active svg { color: var(--accent-ember-bright); }
+.sh__cta { margin-left: auto; }
+@media (max-width: 639px) {
+  /* Two rows on phones: brand + Ride on top, section pills below (scrollable within themselves). */
+  .sh__row { height: auto; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; row-gap: 8px; }
+  .sh__links { order: 3; flex: 1 0 100%; margin: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .sh__links::-webkit-scrollbar { display: none; }
+  .sh__link { flex: 1 0 auto; justify-content: center; min-height: 40px; }
+}
+
+/* ---------- Shared bits ---------- */
+.chips { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin: 0 -2px; padding-left: 2px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { min-height: 40px; cursor: pointer; white-space: nowrap; }
+.chip--active { background: rgba(225, 6, 0, 0.16); border-color: var(--accent-ember); color: #fff; }
+.note { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--text-secondary); }
+.note--warn { color: var(--accent-amber); background: rgba(255, 182, 39, 0.08); border: 1px solid rgba(255, 182, 39, 0.3); padding: 10px 12px; border-radius: var(--radius-md); }
+.state-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 36px 20px; border-radius: var(--radius-lg); background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.state-card svg { color: var(--accent-ember-bright); }
+.state-card h2 { color: #fff; font-size: 1.3rem; }
+.state-card p { max-width: 46ch; line-height: 1.5; }
+.state-card__actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
+.back-link { display: inline-flex; align-items: center; gap: 4px; color: var(--text-secondary); font-size: 0.86rem; width: fit-content; min-height: 36px; }
+.back-link:hover { color: #fff; }
+.skel { background: linear-gradient(100deg, var(--bg-surface-2) 30%, var(--bg-surface-3) 50%, var(--bg-surface-2) 70%); background-size: 220% 100%; animation: skel 1.3s linear infinite; border-radius: 10px; }
+.skel--line { height: 14px; margin-bottom: 10px; }
+.skel--short { width: 55%; }
+@keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.diff { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid; width: fit-content; }
+.diff--easy { color: var(--accent-teal); border-color: rgba(45, 212, 191, 0.5); }
+.diff--moderate { color: var(--accent-amber); border-color: rgba(255, 182, 39, 0.5); }
+.diff--hard { color: var(--accent-red); border-color: rgba(255, 59, 48, 0.55); }
+
+/* ---------- News ---------- */
+.news-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 640px) { .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .news-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; } }
+.news-card { display: flex; flex-direction: column; min-width: 0; border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-subtle); transition: border-color 0.2s, transform 0.2s var(--ease-out); }
+.news-card:hover { border-color: rgba(225, 6, 0, 0.5); transform: translateY(-2px); }
+.news-card__media { position: relative; aspect-ratio: 16 / 9; background: var(--bg-surface-2); overflow: hidden; }
+.news-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.news-card__noimg { width: 100%; height: 100%; display: grid; place-items: center; color: var(--text-muted); background: radial-gradient(circle at 30% 20%, rgba(225, 6, 0, 0.18), transparent 60%), var(--bg-surface-2); }
+.news-card__cat { position: absolute; left: 12px; top: 12px; padding: 4px 10px; border-radius: 999px; background: var(--accent-ember); color: #fff; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.news-card__body { display: flex; flex-direction: column; gap: 8px; padding: 16px; flex: 1; min-width: 0; }
+.news-card__meta { display: flex; justify-content: space-between; gap: 10px; font-size: 0.74rem; color: var(--text-muted); }
+.news-card__source { color: var(--accent-ember-bright); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.news-card__title { font-size: 1.08rem; line-height: 1.28; letter-spacing: -0.01em; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.news-card__desc { color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.news-card__cta { margin-top: auto; align-self: flex-start; }
+.news-card--skeleton:hover { transform: none; border-color: var(--border-subtle); }
+
+/* ---------- Famous rides: grid + cards ---------- */
+.ride-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+@media (min-width: 720px) { .ride-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .ride-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; } }
+.ride-card { display: flex; flex-direction: column; min-width: 0; border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-subtle); }
+.ride-card__media { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--bg-surface-2); }
+.ride-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ride-card__scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(5, 5, 5, 0.92) 0%, rgba(5, 5, 5, 0.1) 60%, rgba(5, 5, 5, 0.35) 100%); }
+.ride-card__media .diff { position: absolute; left: 12px; top: 12px; }
+.ride-card__save { position: absolute; right: 8px; top: 8px; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--glass-border); background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; }
+.ride-card__save--on { color: var(--accent-ember-bright); border-color: var(--accent-ember); }
+.ride-card__title { position: absolute; left: 14px; right: 14px; bottom: 12px; }
+.ride-card__title h2 { font-size: 1.3rem; line-height: 1.1; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7); }
+.ride-card__title p { color: var(--text-secondary); font-size: 0.8rem; margin-top: 2px; }
+.ride-card__map { position: relative; background: #0b0b0b; border-bottom: 1px solid var(--border-subtle); border-top: 1px solid var(--border-subtle); }
+.ride-card__map-tag { position: absolute; right: 10px; bottom: 6px; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.trace { display: block; width: 100%; height: auto; max-height: 130px; }
+.trace__glow { fill: none; stroke: rgba(225, 6, 0, 0.35); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; filter: blur(3px); }
+.trace__line { fill: none; stroke: var(--accent-ember-bright); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.trace__start { fill: #0b0b0b; stroke: #fff; stroke-width: 2; }
+.trace__end { fill: var(--accent-ember); stroke: #fff; stroke-width: 1.5; }
+.ride-card__body { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; flex: 1; }
+.ride-card__path { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 700; font-size: 0.95rem; }
+.ride-card__path svg { color: var(--accent-ember-bright); flex-shrink: 0; }
+.ride-card__stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.ride-card__stats div { background: var(--bg-surface-2); border-radius: 12px; padding: 9px 11px; min-width: 0; }
+.ride-card__stats dt { display: flex; align-items: center; gap: 5px; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.ride-card__stats dd { margin: 3px 0 0; font-weight: 700; font-size: 0.86rem; overflow-wrap: anywhere; }
+.ride-card__desc { color: var(--text-secondary); font-size: 0.86rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ride-card__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; }
+.ride-card__actions .btn { flex: 1 1 130px; min-height: 46px; }
+
+/* ---------- Famous rides: detail ---------- */
+.rd-hero { position: relative; border-radius: var(--radius-lg); overflow: hidden; min-height: 200px; aspect-ratio: 21 / 9; background: var(--bg-surface-2); }
+.rd-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rd-hero__scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(5, 5, 5, 0.95), rgba(5, 5, 5, 0.15) 70%); }
+.rd-hero__text { position: absolute; left: 18px; right: 18px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+.rd-hero__text h1 { font-size: clamp(1.7rem, 5.5vw, 2.8rem); line-height: 1.04; }
+.rd-hero__text p { color: var(--text-secondary); }
+.rd-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.rd-actions .btn { flex: 1 1 200px; }
+.rd-actions--bottom { margin-top: 4px; }
+.rd-map { display: flex; flex-direction: column; gap: 8px; }
+.rd-map .map-view { height: clamp(260px, 52vw, 460px); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-subtle); }
+.rd-map__view { width: 100%; }
+.rd-map__note { font-size: 0.8rem; color: var(--text-muted); min-height: 1.2em; }
+.rd-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+@media (min-width: 720px) { .rd-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.rd-stats div { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 12px 14px; min-width: 0; }
+.rd-stats dt { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.rd-stats dt svg { color: var(--accent-ember-bright); }
+.rd-stats dd { margin: 5px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.rd-section { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--radius-lg); background: var(--bg-surface); border: 1px solid var(--border-subtle); }
+.rd-section h2 { font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+.rd-section h2 svg { color: var(--accent-ember-bright); }
+.rd-section p { color: var(--text-secondary); line-height: 1.6; }
+.rd-section--notes { border-color: rgba(225, 6, 0, 0.35); }
+.rd-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--text-secondary); line-height: 1.5; }
+.rd-list li::marker { color: var(--accent-ember-bright); }
+.rd-fine { font-size: 0.78rem; color: var(--text-muted) !important; }
+
+/* ---------- Touch devices: inputs at 16px so iOS Safari doesn't zoom the page on focus ---------- */
+@media (pointer: coarse) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select, textarea, .field input, .field select { font-size: 16px; }
+}

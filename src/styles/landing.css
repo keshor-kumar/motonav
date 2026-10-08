@@ -34,19 +34,22 @@ html { scroll-behavior: smooth; }
 .lp-nav--solid { background: rgba(5, 5, 5, 0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom-color: var(--glass-border); }
 .lp-nav__inner { width: min(1200px, 100% - 40px); margin-inline: auto; height: 68px; display: flex; align-items: center; gap: 32px; }
 .lp-nav__brand { display: inline-flex; flex-shrink: 0; }
-.lp-nav__links { display: flex; align-items: center; gap: 28px; margin-left: 12px; }
+.lp-nav__links { display: flex; align-items: center; gap: clamp(16px, 2vw, 28px); margin-left: 12px; }
 .lp-nav__links a { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); transition: color 0.2s; }
 .lp-nav__links a:hover { color: #fff; }
 .lp-nav__cta { display: flex; gap: 10px; margin-left: auto; }
 .lp-nav__cta--mobile { display: none; }
 .lp-nav__burger { display: none; margin-left: auto; width: 44px; height: 44px; place-items: center; background: transparent; border: none; color: #fff; }
-@media (max-width: 899px) {
+@media (max-width: 1099px) {
   .lp-nav__cta { display: none; }
   .lp-nav__burger { display: grid; }
   .lp-nav__links {
     position: absolute; top: 100%; left: 0; right: 0; margin: 0; flex-direction: column; align-items: stretch; gap: 0; padding: 8px 20px 24px;
     background: rgba(5, 5, 5, 0.98); border-bottom: 1px solid var(--glass-border);
     opacity: 0; transform: translateY(-8px); pointer-events: none; transition: opacity 0.25s, transform 0.25s var(--ease-out);
+    /* the navbar is position:fixed, so a long menu must scroll inside itself or its last items/CTAs are unreachable on short screens */
+    max-height: calc(100vh - 68px - env(safe-area-inset-top)); max-height: calc(100dvh - 68px - env(safe-area-inset-top));
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   }
   .lp-nav__links--open { opacity: 1; transform: none; pointer-events: auto; }
   .lp-nav__links > a { padding: 16px 4px; font-size: 1.05rem; color: #fff; border-bottom: 1px solid var(--border-subtle); }

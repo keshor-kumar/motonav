@@ -3,11 +3,14 @@ import { Link } from "react-router-dom";
 import { Flag, LogOut, Users } from "lucide-react";
 import MotorcycleIcon from "@/components/common/MotorcycleIcon";
 import ShareRideCard from "@/components/ride/ShareRideCard";
+import CommsBadge from "@/components/comms/CommsBadge";
+import { useRideComms } from "@/context/RideCommsContext";
 import { useGroupRide } from "@/context/GroupRideContext";
 import { haversineMeters } from "@/utils/geo";
 import { derivePresence } from "@/utils/presence";
 import { formatDistanceMeters } from "@/utils/format";
 import type { RiderPresence } from "@/types";
+import type { CommsStatus } from "@/types/comms";
 
 const PRESENCE_LABEL: Record<RiderPresence, string> = { riding: "Riding", stopped: "Stopped", offline: "Offline" };
 
@@ -17,13 +20,14 @@ interface RiderRowProps {
   isMe: boolean;
   isCreator: boolean;
   presence: RiderPresence;
+  comms: CommsStatus | null;
   distanceLabel: string | null;
   selected: boolean;
   onSelect: (id: string) => void;
 }
 
 // memo: a location tick for one rider shouldn't re-render every other row.
-const RiderRow = memo(function RiderRow({ id, name, isMe, isCreator, presence, distanceLabel, selected, onSelect }: RiderRowProps) {
+const RiderRow = memo(function RiderRow({ id, name, isMe, isCreator, presence, comms, distanceLabel, selected, onSelect }: RiderRowProps) {
   return (
     <li>
       <button
@@ -41,6 +45,7 @@ const RiderRow = memo(function RiderRow({ id, name, isMe, isCreator, presence, d
             {isCreator && <span className="crew-rider__tag">Leader</span>}
           </span>
           <span className={`crew-rider__status crew-rider__status--${presence}`}>{isMe ? "You" : PRESENCE_LABEL[presence]}</span>
+          {comms && <CommsBadge status={comms} />}
         </span>
         <span className="crew-rider__dist">{isMe ? "" : distanceLabel ?? ""}</span>
       </button>
@@ -55,6 +60,7 @@ interface CrewPanelProps {
 
 export default function CrewPanel({ selectedRiderId, onSelectRider }: CrewPanelProps) {
   const { session, ride, members, myCoords, leaveRide, endRide, isBusy } = useGroupRide();
+  const { commsStatusFor } = useRideComms();
   const [confirmEnd, setConfirmEnd] = useState(false);
 
   const rows = useMemo(
@@ -71,10 +77,11 @@ export default function CrewPanel({ selectedRiderId, onSelectRider }: CrewPanelP
           isMe,
           isCreator: m.isCreator,
           presence: derivePresence(m),
+          comms: commsStatusFor(m.riderId),
           distanceLabel: distance !== null ? `${formatDistanceMeters(distance)} away` : null,
         };
       }),
-    [members, myCoords, session]
+    [members, myCoords, session, commsStatusFor]
   );
 
   if (!session || !ride) {

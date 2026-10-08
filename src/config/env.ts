@@ -48,3 +48,8 @@ export const SOCKET_URL: string = (import.meta.env.VITE_SOCKET_URL || API_BASE_U
 export function buildJoinUrl(rideCode: string): string {
   return `${PUBLIC_APP_URL}/join/${rideCode}`;
 }
+
+/** Public Moto Community link: https://<app>/community/MNCHENNAI82 */
+export function buildCommunityUrl(code: string): string {
+  return `${PUBLIC_APP_URL}/community/${code}`;
+}

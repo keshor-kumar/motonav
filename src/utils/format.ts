@@ -38,3 +38,29 @@ export function formatDurationSeconds(seconds: number): string {
   if (h <= 0) return `${m} min`;
   return `${h} hr ${m} min`;
 }
+
+// ---------- Moto Community chat formatters ----------
+
+/** 14:05 in the viewer's locale/time zone. */
+export function formatMessageTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** "Today" / "Yesterday" / "12 Oct" separator label. */
+export function formatDayLabel(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+}
+
+/** 0:07 / 1:00 */
+export function formatClockMs(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}

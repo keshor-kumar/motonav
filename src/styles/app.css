@@ -20,6 +20,9 @@
   background: var(--bg-void);
 }
 .app-shell__map { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* While the on-screen keyboard is open (see KeyboardViewportSync) the shell follows the *visible* area, so
+   the sheet's search field and the dock stay above the keyboard on iOS and Android. */
+html[data-kb="open"] .app-shell { bottom: auto; top: var(--vv-top, 0px); height: var(--vv-h, 100%); }
 .app-shell .maplibregl-ctrl-top-right { top: calc(env(safe-area-inset-top) + 72px); right: 6px; }
 @media (pointer: coarse) {
   .app-shell .maplibregl-ctrl-top-right { display: none; }
@@ -137,7 +140,8 @@
   transition: max-height 0.45s var(--ease-spring);
 }
 .app-sheet--open .app-sheet__body {
-  max-height: min(52dvh, 480px); overflow-y: auto; padding: 4px 16px 20px;
+  max-height: min(52vh, 480px); max-height: min(52dvh, 480px, max(120px, calc(var(--vv-h, 100dvh) - 230px)));
+  overflow-y: auto; padding: 4px 16px 20px;
   overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
 }
 @media (max-width: 1023px) {
@@ -259,6 +263,7 @@
 .rd-sheet {
   position: absolute; z-index: 40; left: 12px; right: 12px; bottom: calc(var(--dock-h) + env(safe-area-inset-bottom) + 10px);
   display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 22px;
+  max-height: calc(100dvh - var(--dock-h) - env(safe-area-inset-bottom) - env(safe-area-inset-top) - 130px); overflow-y: auto; overscroll-behavior: contain;
   background: rgba(12, 12, 12, 0.97); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border); box-shadow: var(--shadow-elevated); animation: sheetIn 0.45s var(--ease-spring);
 }
@@ -300,6 +305,7 @@
 .gd-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; gap: 14px;
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 200px - env(safe-area-inset-top)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   background: rgba(10, 10, 10, 0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--glass-border); border-radius: 22px 22px 0 0; box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.55);
 }
@@ -370,7 +376,9 @@
 .sos-btn--holding { filter: brightness(1.2); }
 .sos-btn__label { font-family: var(--font-display); font-weight: 800; font-size: 1.7rem; letter-spacing: 0.12em; line-height: 1; }
 .sos-btn__hint { font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.8; }
-.sos-overlay { position: fixed; inset: 0; z-index: 130; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.82); }
+/* flex + margin:auto (not grid place-items) so a tall dialog on a short screen scrolls instead of being cut off at the top */
+.sos-overlay { position: fixed; inset: 0; z-index: 130; display: flex; overflow-y: auto; overscroll-behavior: contain; padding: 20px; background: rgba(0, 0, 0, 0.82); }
+.sos-overlay > * { margin: auto; }
 .sos-dialog {
   position: relative; width: min(420px, 100%); display: flex; flex-direction: column; gap: 12px; padding: 28px 20px 20px; border-radius: 26px; text-align: center;
   background: var(--bg-raised); border: 1px solid var(--accent-red); box-shadow: 0 0 60px rgba(255, 59, 48, 0.25);

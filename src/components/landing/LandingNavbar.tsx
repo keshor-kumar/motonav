@@ -5,6 +5,9 @@ import Logo from "@/components/common/Logo";
 
 const LINKS = [
   { label: "Ride", to: "/dashboard", external: false },
+  { label: "Rides", to: "/routes", external: false },
+  { label: "News", to: "/news", external: false },
+  { label: "Community", to: "/community", external: false },
   { label: "Explore", to: "#discover", external: true },
   { label: "Features", to: "#group", external: true },
   { label: "Safety", to: "#safety", external: true },

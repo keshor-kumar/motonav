@@ -5,9 +5,13 @@ import type { Config } from "./config.js";
 import type { Hub } from "./hub.js";
 import type { RideService } from "./service.js";
 import { AppError } from "./types.js";
+import { communityRouter } from "./community/routes.js";
+import type { CommunityService } from "./community/service.js";
+import type { MemoryAudioStorage } from "./community/storage.js";
+import type { NewsService } from "./news.js";
 
 /** Tiny fixed-window per-IP limiter (no extra dependency). */
-function rateLimit(maxPerWindow: number, windowMs = 60_000) {
+export function rateLimit(maxPerWindow: number, windowMs = 60_000) {
   const hits = new Map<string, { count: number; resetAt: number }>();
   setInterval(() => {
     const now = Date.now();
@@ -36,7 +40,15 @@ const wrap =
   (req: Request, res: Response, next: NextFunction) =>
     fn(req, res).catch(next);
 
-export function createApp(service: RideService, hub: Hub, config: Config) {
+/** Optional Stage-5 modules. Omitted in the original ride tests; wired in index.ts. */
+export interface AppExtras {
+  community?: CommunityService;
+  /** Dev fallback audio store; null/undefined when Supabase Storage is configured. */
+  memoryAudio?: MemoryAudioStorage | null;
+  news?: NewsService;
+}
+
+export function createApp(service: RideService, hub: Hub, config: Config, extras: AppExtras = {}) {
   const app = express();
   app.set("trust proxy", 1); // behind Render/Railway/Fly proxies — correct client IP for rate limiting
   app.disable("x-powered-by");
@@ -44,7 +56,7 @@ export function createApp(service: RideService, hub: Hub, config: Config) {
   app.use(
     cors({
       origin: (origin, cb) => cb(null, !origin || config.clientOrigins.includes(origin)),
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Audio-Duration-Ms"],
     })
   );
   app.use(express.json({ limit: "10kb" }));
@@ -100,6 +112,17 @@ export function createApp(service: RideService, hub: Hub, config: Config) {
     })
   );
 
+  // WebRTC ICE servers for voice. Authenticated (rider session token) so TURN credentials
+  // are only ever handed to riders of an active ride.
+  app.get(
+    "/api/comms/ice",
+    rateLimit(60),
+    wrap(async (req, res) => {
+      await service.authorize(bearer(req));
+      res.json({ iceServers: config.iceServers });
+    })
+  );
+
   app.post(
     "/api/session/leave",
     rateLimit(30),
@@ -121,12 +144,37 @@ export function createApp(service: RideService, hub: Hub, config: Config) {
     })
   );
 
+  // ---- Moto Community (text + voice chat) — separate router, separate tables, separate token type ----
+  if (extras.community) {
+    app.use("/api/community", communityRouter({ service: extras.community, memoryAudio: extras.memoryAudio ?? null, rateLimit }));
+  }
+
+  // ---- Moto News: server-side proxy so NEWS_API_KEY never reaches the browser ----
+  const news = extras.news;
+  if (news) {
+    app.get(
+      "/api/news/motorcycle",
+      rateLimit(60),
+      wrap(async (req, res) => {
+        const category = typeof req.query.category === "string" ? req.query.category : undefined;
+        const force = req.query.refresh === "1" || req.query.refresh === "true";
+        const result = await news.get({ category, force });
+        res.setHeader("Cache-Control", "public, max-age=120");
+        res.json(result);
+      })
+    );
+  }
+
   app.use((_req, _res, next) => next(new AppError("ride_not_found", 404, "Not found.")));
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof AppError) {
       res.status(err.status).json({ error: { code: err.code, message: err.message } });
+      return;
+    }
+    if ((err as { type?: string }).type === "entity.too.large") {
+      res.status(413).json({ error: { code: "payload_too_large", message: "That upload is too large." } });
       return;
     }
     if (err instanceof SyntaxError) {

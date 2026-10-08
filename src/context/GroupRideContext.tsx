@@ -44,6 +44,8 @@ interface GroupRideContextValue {
   myCoords: Coordinates | null;
   myHeading: number | null;
   isConnected: boolean;
+  /** The one ride socket (null when not in a ride). Rider comms attach to this — no second connection. */
+  socket: GroupSocket | null;
   isBusy: boolean;
   error: string | null;
   rideEndedNotice: boolean;
@@ -66,6 +68,7 @@ export function GroupRideProvider({ children }: { children: ReactNode }) {
   const [ride, setRide] = useState<GroupRide | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [socket, setSocket] = useState<GroupSocket | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rideEndedNotice, setRideEndedNotice] = useState(false);
@@ -89,6 +92,7 @@ export function GroupRideProvider({ children }: { children: ReactNode }) {
   const teardown = useCallback(() => {
     socketRef.current?.disconnect();
     socketRef.current = null;
+    setSocket(null);
     geo.stopWatching();
     lastSentRef.current = null;
     setIsConnected(false);
@@ -106,6 +110,7 @@ export function GroupRideProvider({ children }: { children: ReactNode }) {
 
     const socket = connectRideSocket(session.token);
     socketRef.current = socket;
+    setSocket(socket);
 
     socket.on("connect", () => setIsConnected(true));
     socket.on("disconnect", () => setIsConnected(false));
@@ -141,6 +146,7 @@ export function GroupRideProvider({ children }: { children: ReactNode }) {
       socket.removeAllListeners();
       socket.disconnect();
       if (socketRef.current === socket) socketRef.current = null;
+      setSocket((current) => (current === socket ? null : current));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
@@ -238,6 +244,7 @@ export function GroupRideProvider({ children }: { children: ReactNode }) {
     myCoords: geo.coords,
     myHeading: geo.heading,
     isConnected,
+    socket,
     isBusy,
     error,
     rideEndedNotice,
